@@ -1,0 +1,9 @@
+[package]
+name = "pyrokv-proto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "2"
+bytes.workspace = true
+tokio-util.workspace = true

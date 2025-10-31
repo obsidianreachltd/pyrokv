@@ -1,0 +1,12 @@
+[package]
+name = "pyrokv-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pyrokv-proto = { path = "../pyrokv-proto" }
+bytes.workspace = true
+tokio.workspace = true
+dashmap.workspace = true
+once_cell = "1.21.3"
+ahash = "0.8.12"

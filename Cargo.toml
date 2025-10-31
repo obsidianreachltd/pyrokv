@@ -1,0 +1,24 @@
+[workspace]
+members = [
+  "crates/pyrokv-proto",
+  # "crates/pyrokv-client",
+  "crates/pyrokv-server",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+dashmap = "6"
+thiserror = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
