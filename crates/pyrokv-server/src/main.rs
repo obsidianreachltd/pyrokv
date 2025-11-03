@@ -7,6 +7,15 @@ use client_conn::ClientConn;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+  // Check if storage enabled
+  let storage_enabled: bool = std::env::var("PYROKV_STORAGE_ENABLED")
+    .unwrap_or_else(|_| "false".into())
+    .to_lowercase()
+    .eq("true");
+
+  // Initialize the KV store
+  let kv_store: kv_store::KvStore = kv_store::KvStore::new(storage_enabled);
+
   // Get the port from environment variable or default to 8001
   let port: String = std::env::var("PYROKV_PORT").unwrap_or_else(|_| "8001".into());
   let listener: TcpListener = TcpListener::bind(format!("[::]:{}", port)).await?;
@@ -20,6 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (socket, _) = listener.accept().await?;
     let id: u32 = next_id;
     next_id += 1;
+    let kv_store: kv_store::KvStore = kv_store.clone();
 
     let conn_list: Arc<Mutex<Vec<u32>>> = Arc::clone(&connections);
 
@@ -28,11 +38,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
       {
         let mut list: std::sync::MutexGuard<'_, Vec<u32>> = conn_list.lock().unwrap();
         list.push(id);
-        // println!("Active clients: {:?}", *list);
       }
 
       // Handle connection
-      let mut conn: ClientConn = ClientConn::new(id, socket);
+      let mut conn: ClientConn = ClientConn::new(id, socket, kv_store);
       if let Err(e) = conn.handle_connection().await {
         eprintln!("Client {} error: {}", id, e);
       }
@@ -43,7 +52,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if let Some(pos) = list.iter().position(|x: &u32| *x == id) {
             list.remove(pos);
         }
-        // println!("Client {} disconnected, remaining: {:?}", id, *list);
       }
     });
   }

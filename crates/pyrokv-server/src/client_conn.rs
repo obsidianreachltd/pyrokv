@@ -5,17 +5,18 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use bytes::{BytesMut};
 use std::io;
 
-use crate::kv_store::build_error_response;
+use crate::kv_store::KvStore;
 
 #[derive(Debug)]
 pub struct ClientConn {
   pub id: u32,
   socket: TcpStream,
+  kv_store: KvStore,
 }
 
 impl ClientConn {
-  pub fn new(id: u32, socket: TcpStream) -> Self {
-    Self { id, socket }
+  pub fn new(id: u32, socket: TcpStream, kv_store: KvStore) -> Self {
+    Self { id, socket, kv_store }
   }
 
   pub async fn handle_connection(&mut self) -> io::Result<()> {
@@ -35,7 +36,7 @@ impl ClientConn {
           if frame.header.ty.eq(&FrameType::Request) {
             if frame.header.payload_length != frame.payload.len() as u32 {
               eprintln!("Client {} sent frame with mismatched payload length", self.id);
-              let res: Frame = build_error_response(frame.header.request_id, frame.header.op, RequestError::BadRequest);
+              let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::BadRequest);
               let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
               res.encode_into(&mut resp_buf);
               writer.write_all(&resp_buf).await?;
@@ -44,21 +45,21 @@ impl ClientConn {
             match frame.header.op {
               pyrokv_proto::OpCode::Set => {
                 // Handle Set operation
-                let res: Frame = crate::kv_store::handle_set_operation(&frame);
+                let res: Frame = self.kv_store.handle_set_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
                 res.encode_into(&mut resp_buf);
                 writer.write_all(&resp_buf).await?;
               }
               pyrokv_proto::OpCode::Get => {
                 // Handle Get operation
-                let res: Frame = crate::kv_store::handle_get_operation(&frame);
+                let res: Frame = self.kv_store.handle_get_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
                 res.encode_into(&mut resp_buf);
                 writer.write_all(&resp_buf).await?;
               }
               pyrokv_proto::OpCode::Del => {
                 // Respond to Delete
-                let res: Frame = crate::kv_store::handle_delete_operation(&frame);
+                let res: Frame = self.kv_store.handle_delete_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
                 res.encode_into(&mut resp_buf);
                 writer.write_all(&resp_buf).await?;
@@ -69,7 +70,7 @@ impl ClientConn {
             }
           } else {
             // Handle non-request frames if necessary
-            let res: Frame = build_error_response(frame.header.request_id, frame.header.op, RequestError::BadRequest);
+            let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::BadRequest);
             let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
             res.encode_into(&mut resp_buf);
             writer.write_all(&resp_buf).await?;
