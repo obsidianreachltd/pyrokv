@@ -36,6 +36,12 @@ By default, PyroKV runs on port `8001`. To change this, use the following enviro
 PYROKV_PORT=<your-port-number>
 ```
 
+**NOTE** You must also specify the port mapping in the docker run command, e.g.
+
+```bash
+docker run -p 9000:9000 -e PYROKV_PORT=9000 pyrokv:latest
+```
+
 ### Enabling Persistence
 
 To enable file-based KV persistence, set the following environment variable to `true`:
@@ -51,7 +57,7 @@ To run on Docker, use the following command:
 **Minimal Run, Default Settings**
 
 ```bash
-docker run pyrokv-server
+docker run pyrokv
 ```
 
 This exposes the default port, `8001`
@@ -59,9 +65,5 @@ This exposes the default port, `8001`
 **Custom Port**
 
 ```bash
-docker run -e PYROKV_PORT=9000 -p 9000:9000 pyrokv-server
+docker run -e PYROKV_PORT=9000 -p 9000:9000 pyrokv
 ```
-
-## TODO:
-
-* Make KVStore a single class that's referenced by each connection. Initialise with storage enabled flag.

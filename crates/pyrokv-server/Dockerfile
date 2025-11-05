@@ -12,6 +12,6 @@ WORKDIR /usr/src/pyrokv-server
 
 COPY --from=builder /usr/src/pyrokv-server/target/release/pyrokv-server .
 
-EXPOSE 8001
+RUN mkdir -p /var/lib/pyrokv/data
 
-ENTRYPOINT ["/bin/bash", "-c", "./pyrokv-server --port ${PYROKV_PORT:-8001}"]
+CMD ["./pyrokv-server"]

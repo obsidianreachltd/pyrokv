@@ -21,7 +21,7 @@ pub struct FileManager {
 }
 
 impl FileManager {
-  const DATA_DIR: &'static str = "/var/lib/data/pyrokv/";
+  const DATA_DIR: &'static str = "/var/lib/pyrokv/data";
 
   pub fn new(rx: Receiver<FMPacket>) -> Self {
     Self { rx }
@@ -37,6 +37,7 @@ impl FileManager {
       }
     };
     let mut packets: Vec<KVPacket> = Vec::new();
+    let mut num_loaded: usize = 0;
     for entry in paths {
       let entry: DirEntry = entry?;
       let path: std::path::PathBuf = entry.path();
@@ -54,7 +55,9 @@ impl FileManager {
           }
         }
       }
+      num_loaded += 1;
     }
+    println!("Loaded {} KV files from disk", num_loaded);
     Ok(packets)
   }
 
