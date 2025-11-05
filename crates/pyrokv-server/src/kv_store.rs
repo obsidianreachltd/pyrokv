@@ -3,8 +3,9 @@ use once_cell::sync::Lazy;
 use ahash::RandomState;
 use pyrokv_proto::{Frame, Header, KPacket, KVPacket, error::{DecodeError, RequestError}};
 use bytes::{Bytes, BytesMut};
-use std::io::{Read, Write};
-use std::fs::{File, DirEntry, ReadDir, read_dir};
+use std::sync::mpsc::{Sender};
+
+use crate::file_manager::{FMOpCode, FMPacket};
 
 #[derive(Clone, Debug)]
 struct ValueEntry {
@@ -15,6 +16,7 @@ struct ValueEntry {
 #[derive(Clone, Debug)]
 pub struct KvStore {
   storage_enabled: bool,
+  tx: Sender<FMPacket>,
 }
 
 /// A single, global KV store shared by all connections.
@@ -25,52 +27,22 @@ static KV: Lazy<DashMap<Bytes, ValueEntry, RandomState>> = Lazy::new(|| {
 });
 
 impl KvStore {
-  const DATA_DIR: &'static str = "/var/lib/data/pyrokv/";
-
-  pub fn new(storage_enabled: bool) -> Self {
-    let kv_store: Self = Self {
+  pub fn new(storage_enabled: bool, tx: Sender<FMPacket>) -> Self {
+    Self {
       storage_enabled,
-    };
-    if storage_enabled {
-      kv_store.load_from_disk();
+      tx,
     }
-    kv_store
   }
 
-  fn load_from_disk(&self) {
-    // Load all existing KV files from disk into the in-memory store
-    if !self.storage_enabled {
-      return;
-    }
-    let paths: ReadDir = match read_dir(Self::DATA_DIR) {
-      Ok(p) => p,
-      Err(e) => {
-        eprintln!("Failed to read data directory {}: {}", Self::DATA_DIR, e);
-        return;
-      }
-    };
-    for entry in paths {
-      let entry: DirEntry = entry.expect("Failed to read dir entry");
-      let path: std::path::PathBuf = entry.path();
-      if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("dat") {
-        let mut file: File = File::open(&path).expect("Failed to open KV file");
-        let mut buf: Vec<u8> = Vec::new();
-        file.read_to_end(&mut buf).expect("Failed to read KV file");
-        let mut bytes: Bytes = Bytes::from(buf);
-        match KVPacket::decode_from(&mut bytes) {
-          Ok(kv_packet) => {
-            match self.store_kv_packet(&kv_packet) {
-              Ok(_) => {},
-              Err(e) => {
-                eprintln!("Failed to store KV packet from file {:?}: {}", path, e);
-              }
-            }
-          }
-          Err(e) => {
-            eprintln!("Failed to decode KVPacket from file {:?}: {}", path, e);
-          }
-        }
-      }
+  pub fn load_data(&self, data: Vec<KVPacket>) {
+    for kv in data {
+      KV.insert(
+        kv.key.clone(),
+        ValueEntry {
+          value: kv.value.clone(),
+          expiry: kv.expiry,
+        },
+      );
     }
   }
   
@@ -90,14 +62,7 @@ impl KvStore {
   fn store_kv_packet(&self,kv: &KVPacket) -> Result<bool, RequestError> {
     if self.storage_enabled {
       let kv_clone = kv.clone();
-      std::thread::spawn(move || {
-        let filename: String = format!("{}/{}.dat", Self::DATA_DIR, hex::encode(&kv_clone.key));
-        let mut file: File = File::create(&filename).expect("Failed to create KV file");
-        // Encode the KVPacket to bytes
-        let mut buf: BytesMut = BytesMut::with_capacity(kv_clone.encoded_len());
-        kv_clone.encode_into(&mut buf);
-        file.write_all(&buf).expect("Failed to write KV value to file");
-      });
+      self.tx.send(FMPacket { op: FMOpCode::Set, pkt: kv_clone }).expect("Failed to send KVPacket to FileManager");
     }
     KV.insert(
       kv.key.clone(),
@@ -135,16 +100,7 @@ impl KvStore {
 
   fn delete_kv_packet(&self, key: &Bytes) -> Result<bool, RequestError> {
     if self.storage_enabled {
-      let key_clone = key.clone();
-      std::thread::spawn(move || {
-        let filename: String = format!("{}/{}.dat", Self::DATA_DIR, hex::encode(&key_clone));
-        match std::fs::remove_file(&filename) {
-          Ok(_) => {},
-          Err(e) => {
-            eprintln!("Failed to delete KV file {}: {}", filename, e);
-          }
-        }
-      });
+      self.tx.send(FMPacket { op: FMOpCode::Delete, pkt: KVPacket { expiry: 0, key: key.clone(), value: Bytes::new() } }).expect("Failed to send delete packet to FileManager");
     }
     KV.remove(key);
     Ok(true)

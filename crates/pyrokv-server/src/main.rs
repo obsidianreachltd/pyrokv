@@ -1,9 +1,14 @@
 use tokio::net::{TcpListener};
 use std::{sync::{Arc, Mutex}, error::Error};
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc;
 
 pub mod client_conn;
 mod kv_store;
+mod file_manager;
 use client_conn::ClientConn;
+
+use crate::file_manager::FMPacket;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -13,8 +18,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .to_lowercase()
     .eq("true");
 
+  let (tx, rx): (Sender<FMPacket>, Receiver<FMPacket>) = mpsc::channel();
+
   // Initialize the KV store
-  let kv_store: kv_store::KvStore = kv_store::KvStore::new(storage_enabled);
+  let kv_store: kv_store::KvStore = kv_store::KvStore::new(storage_enabled, tx);
+
+  // Initialize and start the file manager
+  if storage_enabled {
+    let file_manager: file_manager::FileManager = file_manager::FileManager::new(rx);
+    match file_manager.load_from_disk() {
+      Ok(d) => {
+        kv_store.load_data(d);
+      },
+      Err(e) => {
+        eprintln!("Failed to load data from disk: {}", e);
+      }
+    };
+    std::thread::spawn(move || {
+      file_manager.start_listener();
+    });
+  }
 
   // Get the port from environment variable or default to 8001
   let port: String = std::env::var("PYROKV_PORT").unwrap_or_else(|_| "8001".into());
