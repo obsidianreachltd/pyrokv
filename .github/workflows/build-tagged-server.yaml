@@ -63,7 +63,7 @@ jobs:
           IMAGE_TAG: ${{ github.ref_name }}
           IMAGE_SHA: ${{ github.sha }}
         run: |
-          docker tag pyrokv:${IMAGE_TAG} ${DOCKER_HUB_USERNAME}/pyrokv:${IMAGE_TAG}
-          docker tag pyrokv:${IMAGE_SHA} ${DOCKER_HUB_USERNAME}/pyrokv:${IMAGE_SHA}
-          docker tag pyrokv:latest ${DOCKER_HUB_USERNAME}/pyrokv:latest
-          docker push ${DOCKER_HUB_USERNAME}/pyrokv --all-tags
+          docker tag pyrokv:${IMAGE_TAG} obsidianreachltd/pyrokv:${IMAGE_TAG}
+          docker tag pyrokv:${IMAGE_SHA} obsidianreachltd/pyrokv:${IMAGE_SHA}
+          docker tag pyrokv:latest obsidianreachltd/pyrokv:latest
+          docker push obsidianreachltd/pyrokv --all-tags
