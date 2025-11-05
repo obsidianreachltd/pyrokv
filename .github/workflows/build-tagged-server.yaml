@@ -48,7 +48,6 @@ jobs:
                        -t pyrokv:${IMAGE_TAG} \
                        -t pyrokv:${IMAGE_SHA} \
                        -t pyrokv:latest \
-
                        -f crates/pyrokv-server/Dockerfile .
 
       - name: Push to Artifact Registry
@@ -67,5 +66,4 @@ jobs:
           docker tag pyrokv:${IMAGE_TAG} ${DOCKER_HUB_USERNAME}/pyrokv:${IMAGE_TAG}
           docker tag pyrokv:${IMAGE_SHA} ${DOCKER_HUB_USERNAME}/pyrokv:${IMAGE_SHA}
           docker tag pyrokv:latest ${DOCKER_HUB_USERNAME}/pyrokv:latest
-
           docker push ${DOCKER_HUB_USERNAME}/pyrokv --all-tags
