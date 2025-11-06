@@ -39,7 +39,7 @@ PYROKV_PORT=<your-port-number>
 **NOTE** You must also specify the port mapping in the docker run command, e.g.
 
 ```bash
-docker run -p 9000:9000 -e PYROKV_PORT=9000 pyrokv:latest
+docker run -p 9000:9000 -e PYROKV_PORT=9000 obsidianreachltd/pyrokv:latest
 ```
 
 ### Enabling Persistence
@@ -54,16 +54,41 @@ PYROKV_STORAGE_ENABLED=true
 
 To run on Docker, use the following command:
 
-**Minimal Run, Default Settings**
+#### Minimal Run, Default Settings
 
 ```bash
-docker run pyrokv
+docker run obsidianreachltd/pyrokv:latest
 ```
 
-This exposes the default port, `8001`
+This exposes the default port, `8001` with **no persistent storage**.
 
-**Custom Port**
+#### Custom Port
 
 ```bash
-docker run -e PYROKV_PORT=9000 -p 9000:9000 pyrokv
+docker run -e PYROKV_PORT=9000 -p 9000:9000 obsidianreachltd/pyrokv:latest
+```
+
+#### External Volume Mounted
+
+To run PyroKV with an external volume mounted to the container for the data, use the following:
+
+```bash
+docker run -e PYROKV_STORAGE_ENABLED=true -p 8001:8001 -v /your/volume/path:/var/lib/pyrokv obsidianreachltd/pyrokv:latest
+```
+
+#### Docker Compose Example
+
+```yaml
+services:
+  pyrokv:
+    image: obsidianreachltd/pyrokv:latest
+    ports:
+      - 8001:8001
+    environment:
+      - PYROKV_STORAGE_ENABLED=true
+    volumes:
+      - pyrokv-data:/var/lib/pyrokv/data
+
+  volumes:
+    pyrokv-data
 ```

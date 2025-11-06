@@ -28,6 +28,15 @@ static KV: Lazy<DashMap<Bytes, ValueEntry, RandomState>> = Lazy::new(|| {
 
 impl KvStore {
   pub fn new(storage_enabled: bool, tx: Sender<FMPacket>) -> Self {
+    std::thread::spawn({
+      let kv_store: KvStore = Self {
+        storage_enabled,
+        tx: tx.clone(),
+      };
+      move || {
+        kv_store.garbage_collector();
+      }
+    });
     Self {
       storage_enabled,
       tx,
@@ -104,6 +113,34 @@ impl KvStore {
     }
     KV.remove(key);
     Ok(true)
+  }
+
+  fn garbage_collector(&self) {
+    loop {
+      std::thread::sleep(std::time::Duration::from_secs(10));
+      let keys_to_delete: Vec<Bytes> = KV.iter()
+        .filter_map(|entry| {
+          let kv_packet = KVPacket {
+            expiry: entry.expiry,
+            key: entry.key().clone(),
+            value: entry.value().value.clone(),
+          };
+          if kv_packet.expired() {
+            Some(entry.key().clone())
+          } else {
+            None
+          }
+        })
+        .collect();
+      for key in keys_to_delete {
+        match self.delete_kv_packet(&key) {
+          Ok(_) => {},
+          Err(e) => {
+            eprintln!("Failed to delete expired KV key {:?}: {}", key, e);
+          }
+        }
+      }
+    }
   }
 
   pub fn handle_set_operation(&self, frame: &Frame) -> Frame {
