@@ -1,7 +1,5 @@
 use tokio::net::{TcpListener};
 use std::{sync::{Arc, Mutex}, error::Error};
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::mpsc;
 
 pub mod client_conn;
 mod kv_store;
@@ -22,26 +20,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let auth_enabled: bool = std::env::var("PYROKV_AUTH_PASSWORD")
     .is_ok();
 
-  let (tx, rx): (Sender<FMPacket>, Receiver<FMPacket>) = mpsc::channel();
+  let (tx, rx) = crossbeam_channel::bounded::<FMPacket>(10_000);
 
   // Initialize the KV store
   let kv_store: kv_store::KvStore = kv_store::KvStore::new(storage_enabled, tx);
 
-  // Initialize and start the file manager
-  if storage_enabled {
-    let file_manager: file_manager::FileManager = file_manager::FileManager::new(rx);
-    match file_manager.load_from_disk() {
-      Ok(d) => {
-        kv_store.load_data(d);
-      },
-      Err(e) => {
-        eprintln!("Failed to load data from disk: {}", e);
-      }
-    };
-    std::thread::spawn(move || {
-      file_manager.start_listener();
-    });
-  }
+    // Initialize and start the file manager
+    if storage_enabled {
+      let file_manager: file_manager::FileManager = match file_manager::FileManager::new(rx) {
+        Ok(fm) => fm,
+        Err(e) => {
+          eprintln!("Failed to initialize FileManager: {}", e);
+          return Err(e.into());
+        }
+      };
+
+      match file_manager.load_from_disk() {
+        Ok(d) => kv_store.load_data(d),
+        Err(e) => eprintln!("Failed to load data from disk: {}", e),
+      };
+
+      std::thread::spawn(move || {
+        file_manager.start_listener();
+      });
+    }
 
   // Get the port from environment variable or default to 8001
   let port: String = std::env::var("PYROKV_PORT").unwrap_or_else(|_| "8001".into());

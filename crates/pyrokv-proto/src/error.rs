@@ -23,6 +23,7 @@ pub enum RequestError {
   BadRequest = 0x04,
   InternalError = 0x05,
   Unauthorized = 0x06,
+  ServerBusy = 0x07,
 }
 
 impl Display for RequestError { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{self:?}") } }

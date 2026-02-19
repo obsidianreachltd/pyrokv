@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use ahash::RandomState;
 use pyrokv_proto::{Frame, Header, KPacket, KVPacket, error::{DecodeError, RequestError}};
 use bytes::{Bytes, BytesMut};
-use std::sync::mpsc::{Sender};
+use crossbeam_channel::Sender;
 
 use crate::file_manager::{FMOpCode, FMPacket};
 
@@ -71,7 +71,12 @@ impl KvStore {
   fn store_kv_packet(&self,kv: &KVPacket) -> Result<bool, RequestError> {
     if self.storage_enabled {
       let kv_clone = kv.clone();
-      self.tx.send(FMPacket { op: FMOpCode::Set, pkt: kv_clone }).expect("Failed to send KVPacket to FileManager");
+      // Non-blocking. If the persistence queue is full, fail fast.
+      if self.tx.try_send(FMPacket { op: FMOpCode::Set, pkt: kv_clone }).is_err() {
+        // You should map this to a "server busy / backpressure" error.
+        // If you don’t have one yet, add it to RequestError (recommended).
+        return Err(RequestError::ServerBusy);
+      }
     }
     KV.insert(
       kv.key.clone(),
@@ -109,8 +114,13 @@ impl KvStore {
 
   fn delete_kv_packet(&self, key: &Bytes) -> Result<bool, RequestError> {
     if self.storage_enabled {
-      self.tx.send(FMPacket { op: FMOpCode::Delete, pkt: KVPacket { expiry: 0, key: key.clone(), value: Bytes::new() } }).expect("Failed to send delete packet to FileManager");
+      let pkt: KVPacket = KVPacket { expiry: 0, key: key.clone(), value: Bytes::new() };
+
+      if self.tx.try_send(FMPacket { op: FMOpCode::Delete, pkt }).is_err() {
+        return Err(RequestError::ServerBusy);
+      }
     }
+
     KV.remove(key);
     Ok(true)
   }
