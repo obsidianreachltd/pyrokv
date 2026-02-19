@@ -8,6 +8,8 @@ pub enum DecodeError {
   BadVersion(u8),
   BadType(u8),
   BadOpCode(u8),
+  InvalidLength { expected: u32, got: u32 },
+  Malformed(String),
 }
 
 impl Display for DecodeError { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{self:?}") } }
