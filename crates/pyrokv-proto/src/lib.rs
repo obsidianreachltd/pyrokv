@@ -12,34 +12,6 @@ pub use frame::Frame;
 pub use kpacket::KPacket;
 pub use kvpacket::KVPacket;
 
-pub fn decode_header(buf: &mut Bytes) -> Result<Header, crate::error::DecodeError> {
-  if buf.remaining() < 12 {
-    return Err(Underflow);
-  }
-
-  let op: OpCode = match OpCode::from(buf[3]) {
-    Some(op) => op,
-    None => return Err(BadOpCode(buf[3]))
-  };
-
-  let ty: FrameType = match FrameType::from(buf[4]) {
-    Some(ty) => ty,
-    None => return Err(BadType(buf[4]))
-  };
-
-  let flags: Flags = Flags::from_bits_truncate(buf.get_u16());
-  let request_id: u32 = buf.get_u32();
-  let payload_length: u32 = buf.get_u32();
-
-  Ok(Header {
-    op,
-    ty,
-    flags,
-    request_id,
-    payload_length,
-  })
-}
-
 pub fn encode_get_request(request_id: u32, key: &[u8]) -> Frame {
   let mut payload: BytesMut = BytesMut::with_capacity(4 + key.len());
   payload.put_u32(key.len() as u32);
