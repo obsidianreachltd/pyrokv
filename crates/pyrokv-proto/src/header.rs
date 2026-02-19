@@ -40,7 +40,8 @@ pub enum OpCode {
   MGet=0x05,
   Exists=0x06,
   Ping=0x10,
-  Info=0x11
+  Info=0x11,
+  Auth=0x20,
 }
 
 impl OpCode {
@@ -54,6 +55,7 @@ impl OpCode {
       0x06 => Some(OpCode::Exists),
       0x10 => Some(OpCode::Ping),
       0x11 => Some(OpCode::Info),
+      0x20 => Some(OpCode::Auth),
       _ => None,
     }
   }
@@ -117,6 +119,7 @@ impl Header {
       0x06 => OpCode::Exists,
       0x10 => OpCode::Ping,
       0x11 => OpCode::Info,
+      0x20 => OpCode::Auth,
       x => return Err(BadOpCode(x)),
     };
     let ty: FrameType = match b.get_u8() { 0 => FrameType::Request, 1 => FrameType::Response, 2 => FrameType::Notification, x => return Err(BadType(x)) };

@@ -18,6 +18,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .to_lowercase()
     .eq("true");
 
+  // Check if auth enabled (if PYROKV_AUTH_PASSWORD is set)
+  let auth_enabled: bool = std::env::var("PYROKV_AUTH_PASSWORD")
+    .is_ok();
+
   let (tx, rx): (Sender<FMPacket>, Receiver<FMPacket>) = mpsc::channel();
 
   // Initialize the KV store
@@ -64,7 +68,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
       }
 
       // Handle connection
-      let mut conn: ClientConn = ClientConn::new(id, socket, kv_store);
+      let mut authenticated: bool = true;
+      if auth_enabled {
+        authenticated = false;
+      }
+      let mut conn: ClientConn = ClientConn::new(id, authenticated, socket, kv_store);
       if let Err(e) = conn.handle_connection().await {
         eprintln!("Client {} error: {}", id, e);
       }

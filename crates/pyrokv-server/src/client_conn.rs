@@ -10,13 +10,14 @@ use crate::kv_store::KvStore;
 #[derive(Debug)]
 pub struct ClientConn {
   pub id: u32,
+  authenticated: bool,
   socket: TcpStream,
   kv_store: KvStore,
 }
 
 impl ClientConn {
-  pub fn new(id: u32, socket: TcpStream, kv_store: KvStore) -> Self {
-    Self { id, socket, kv_store }
+  pub fn new(id: u32, authenticated: bool, socket: TcpStream, kv_store: KvStore) -> Self {
+    Self { id, authenticated, socket, kv_store }
   }
 
   pub async fn handle_connection(&mut self) -> io::Result<()> {
@@ -44,6 +45,13 @@ impl ClientConn {
             }
             match frame.header.op {
               pyrokv_proto::OpCode::Set => {
+                if self.authenticated == false {
+                  let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::Unauthorized);
+                  let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
+                  res.encode_into(&mut resp_buf);
+                  writer.write_all(&resp_buf).await?;
+                  continue;
+                }
                 // Handle Set operation
                 let res: Frame = self.kv_store.handle_set_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
@@ -51,6 +59,13 @@ impl ClientConn {
                 writer.write_all(&resp_buf).await?;
               }
               pyrokv_proto::OpCode::Get => {
+                  if self.authenticated == false {
+                    let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::Unauthorized);
+                    let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
+                    res.encode_into(&mut resp_buf);
+                    writer.write_all(&resp_buf).await?;
+                    continue;
+                  }
                 // Handle Get operation
                 let res: Frame = self.kv_store.handle_get_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
@@ -58,13 +73,38 @@ impl ClientConn {
                 writer.write_all(&resp_buf).await?;
               }
               pyrokv_proto::OpCode::Del => {
+                  if self.authenticated == false {
+                    let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::Unauthorized);
+                    let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
+                    res.encode_into(&mut resp_buf);
+                    writer.write_all(&resp_buf).await?;
+                    continue;
+                  }
                 // Respond to Delete
                 let res: Frame = self.kv_store.handle_delete_operation(&frame);
                 let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
                 res.encode_into(&mut resp_buf);
                 writer.write_all(&resp_buf).await?;
               }
+              pyrokv_proto::OpCode::Auth => {
+                // Handle Auth operation
+                let res: Frame = self.kv_store.handle_auth_operation(&frame);
+                // Check that res.header.flags doesn't include an error flag
+                if res.header.flags.contains(pyrokv_proto::Flags::ERROR) == false {
+                  self.authenticated = true;
+                }
+                let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
+                res.encode_into(&mut resp_buf);
+                writer.write_all(&resp_buf).await?;
+              }
               _ => {
+                if self.authenticated == false {
+                  let res: Frame = self.kv_store.build_error_response(frame.header.request_id, frame.header.op, RequestError::Unauthorized);
+                  let mut resp_buf: BytesMut = BytesMut::with_capacity(res.encoded_len());
+                  res.encode_into(&mut resp_buf);
+                  writer.write_all(&resp_buf).await?;
+                  continue;
+                }
                 // Handle other opcodes as needed
               }
             }

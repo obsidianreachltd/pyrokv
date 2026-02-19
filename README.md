@@ -50,6 +50,14 @@ To enable file-based KV persistence, set the following environment variable to `
 PYROKV_STORAGE_ENABLED=true
 ```
 
+### Password Authentication
+
+To enable password authentication, set the following environment variable:
+
+```bash
+PYROKV_AUTH_PASSWORD=<my-secret-password>
+```
+
 ### Docker
 
 To run on Docker, use the following command:
@@ -86,6 +94,7 @@ services:
       - 8001:8001
     environment:
       - PYROKV_STORAGE_ENABLED=true
+      - PYROKV_AUTH_PASSWORD=5ecr3tP@s5w0rD
     volumes:
       - pyrokv-data:/var/lib/pyrokv/data
 

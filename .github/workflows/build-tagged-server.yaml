@@ -46,7 +46,6 @@ jobs:
                        -t us-central1-docker.pkg.dev/pyrokv/pyrokv/pyrokv-server:${IMAGE_SHA} \
                        -t us-central1-docker.pkg.dev/pyrokv/pyrokv/pyrokv-server:latest \
                        -t pyrokv:${IMAGE_TAG} \
-                       -t pyrokv:${IMAGE_SHA} \
                        -t pyrokv:latest \
                        -f crates/pyrokv-server/Dockerfile .
 
@@ -64,6 +63,5 @@ jobs:
           IMAGE_SHA: ${{ github.sha }}
         run: |
           docker tag pyrokv:${IMAGE_TAG} obsidianreachltd/pyrokv:${IMAGE_TAG}
-          docker tag pyrokv:${IMAGE_SHA} obsidianreachltd/pyrokv:${IMAGE_SHA}
           docker tag pyrokv:latest obsidianreachltd/pyrokv:latest
           docker push obsidianreachltd/pyrokv --all-tags

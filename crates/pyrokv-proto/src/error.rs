@@ -20,6 +20,7 @@ pub enum RequestError {
   KeyValueTooLarge = 0x03,
   BadRequest = 0x04,
   InternalError = 0x05,
+  Unauthorized = 0x06,
 }
 
 impl Display for RequestError { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{self:?}") } }

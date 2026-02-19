@@ -143,6 +143,36 @@ impl KvStore {
     }
   }
 
+  pub fn handle_auth_operation(&self, frame: &Frame) -> Frame {
+    let mut bytes: Bytes = frame.payload.clone();
+    let password: Result<KPacket, DecodeError> = KPacket::decode_from(&mut bytes);
+    // Check if we have a password set, and if not, return an error
+    let expected_password: Bytes = std::env::var("PYROKV_AUTH_PASSWORD").unwrap_or_else(|_| "".to_string()).into();
+    match password {
+      Ok(password) => {
+        if password.key.eq(&expected_password) {
+          // Build success response
+          return Frame{
+            header: Header{
+              request_id: frame.header.request_id,
+              ty: pyrokv_proto::FrameType::Response,
+              op: frame.header.op,
+              flags: pyrokv_proto::Flags::empty(),
+              payload_length: 0,
+            },
+            payload: Bytes::new(),
+          };
+        } else {
+          return self.build_error_response(frame.header.request_id, frame.header.op, RequestError::Unauthorized);
+        }
+      }
+      Err(e) => {
+        eprintln!("Client {} sent invalid KPacket: {}", frame.header.request_id, e);
+        return self.build_error_response(frame.header.request_id, frame.header.op, RequestError::BadRequest);
+      }
+    }
+  }
+
   pub fn handle_set_operation(&self, frame: &Frame) -> Frame {
     let mut bytes: Bytes = frame.payload.clone();
     let kv: Result<KVPacket, DecodeError> = KVPacket::decode_from(&mut bytes);
