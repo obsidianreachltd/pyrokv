@@ -80,11 +80,12 @@ pub struct Header {
 }
 
 impl Header {
-  pub const LEN: usize = 14;
+  pub const LEN: usize = 15;
 
   pub fn debug(&self) -> String {
     format!(
-      "Header {{ op: {:?}, ty: {:?}, flags: {:?}, request_id: {}, payload_length: {} }}",
+      "Header {{ magic: 0x{:04X}, op: {:?}, ty: {:?}, flags: {:?}, request_id: {}, payload_length: {} }}",
+      MAGIC,
       self.op,
       self.ty,
       self.flags,

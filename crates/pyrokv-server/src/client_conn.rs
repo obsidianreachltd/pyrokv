@@ -116,40 +116,41 @@ impl ClientConn {
   /// - Ok(Some(frame)) => decoded and removed from buf
   /// - Ok(None)  => not enough bytes yet
   /// - Err(e)    => invalid protocol / frame
-  fn try_decode_one(buf: &mut BytesMut) -> Result<Option<Frame>, pyrokv_proto::error::DecodeError> {
-    // Keep these local so we don’t depend on internal proto module exports.
-    // Your header is: version(u8) + op(u8) + expiry(u64) + payload_len(u32) = 14 bytes.
-    const HEADER_LEN: usize = 14;
-    const PAYLOAD_LEN_OFFSET: usize = 10; // payload_len starts after 1+1+8 bytes
-    const MAX_PAYLOAD: usize = 1024 * 1024; // 1 MiB safety cap (tune as you like)
+  fn try_decode_one(
+    buf: &mut BytesMut,
+  ) -> Result<Option<Frame>, pyrokv_proto::error::DecodeError> {
+    use pyrokv_proto::error::DecodeError;
 
-    if buf.len() < HEADER_LEN {
+    const MAX_PAYLOAD: usize = 1024 * 1024; // 1 MiB (tune)
+
+    // Need at least a full header before we can know payload length
+    if buf.len() < pyrokv_proto::Header::LEN {
       return Ok(None);
     }
 
-    let payload_len = u32::from_be_bytes([
-      buf[PAYLOAD_LEN_OFFSET],
-      buf[PAYLOAD_LEN_OFFSET + 1],
-      buf[PAYLOAD_LEN_OFFSET + 2],
-      buf[PAYLOAD_LEN_OFFSET + 3],
-    ]) as usize;
+    // Peek header without consuming the real buffer
+    let mut header_bytes = buf[..pyrokv_proto::Header::LEN].to_vec();
+    let mut b = bytes::Bytes::from(std::mem::take(&mut header_bytes));
 
+    let header = pyrokv_proto::Header::decode_from(&mut b)?;
+
+    let payload_len = header.payload_length as usize;
     if payload_len > MAX_PAYLOAD {
-      // Treat as invalid protocol; caller will close the connection.
-      return Err(pyrokv_proto::error::DecodeError::Malformed(format!(
-      "Payload length {payload_len} exceeds maximum allowed"
+      return Err(DecodeError::Malformed(format!(
+        "Payload length {} exceeds maximum allowed ({})",
+        payload_len, MAX_PAYLOAD
       )));
     }
 
-    let frame_len = HEADER_LEN + payload_len;
+    let frame_len = pyrokv_proto::Header::LEN + payload_len;
     if buf.len() < frame_len {
       return Ok(None);
     }
 
-    // Split off exactly one frame (no copy), then decode from that slice.
+    // Now we have the full frame: split and decode for real (no copy)
     let frame_bytes = buf.split_to(frame_len).freeze();
-    let mut b = frame_bytes;
-    Frame::decode_from(&mut b).map(Some)
+    let mut fb = frame_bytes;
+    Frame::decode_from(&mut fb).map(Some)
   }
 
   pub async fn handle_connection(&mut self) -> std::io::Result<()> {

@@ -143,7 +143,7 @@ impl FileManager {
                   eprintln!("Failed to write KV file {}: {}", filename, e);
                 }
                 // BufWriter flush on drop is usually fine; explicit flush if you want durability guarantees:
-                // let _ = writer.flush();
+                let _ = writer.flush();
               }
               Err(e) => {
                 eprintln!("Failed to create KV file {}: {}", filename, e);
